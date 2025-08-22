@@ -34,10 +34,10 @@ System(move_rects) {
 System(keyborad_events) {
     QueryByComponents(e, COMP_Player | COMP_Velocity) {
         Velocity *v = get_Velocity(e);
-        if(IsKeyPressed(KEY_W)) {v->vy += -1.0f; return;}
-        if(IsKeyPressed(KEY_S)) {v->vy +=  1.0f; return;}
-        if(IsKeyPressed(KEY_D)) {v->vx +=  1.0f; return;}
-        if(IsKeyPressed(KEY_A)) {v->vx += -1.0f; return;}
+        if(IsKeyPressed(KEY_W)) {v->vy = -1.0f; return;}
+        if(IsKeyPressed(KEY_S)) {v->vy =  1.0f; return;}
+        if(IsKeyPressed(KEY_D)) {v->vx =  1.0f; return;}
+        if(IsKeyPressed(KEY_A)) {v->vx = -1.0f; return;}
     }
 }
 
