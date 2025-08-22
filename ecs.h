@@ -53,13 +53,20 @@
 #define Component(name, ...) \
     static size_t COMP_##name; \
     typedef __VA_ARGS__ name; \
-    static name name##_components[100]; \
-    void register_##name() { if(COMP_##name == 0) COMP_##name = 1 << component_type_iota(); }\
-    name* get_##name(Entity* e) { return &name##_components[e->id]; } \
+    typedef struct {size_t capacity, count; name * items;} ECS_DA_##name;\
+    static ECS_DA_##name name##_components; \
+    void cleanup_##name() { \
+        free(name##_components.items); \
+    }\
+    void register_##name() { \
+        if(COMP_##name == 0) COMP_##name = 1 << component_type_iota(); \
+        ecs_da_append(&components_cleanups, cleanup_##name);\
+    }\
+    name* get_##name(Entity* e) { return &name##_components.items[e->id]; } \
     void add_##name(Entity* e, name value) { \
         if(COMP_##name == 0) { printf("[ERROR] Forgot to register `%s` componet first\n", #name); abort(); }\
         e->mask |= COMP_##name; \
-        name##_components[e->id] = value; \
+        ecs_da_append(&(name##_components), value); \
     }
 
 #define System(name, ...) void name##_system(__VA_ARGS__)
@@ -71,9 +78,12 @@
 // ----------------------
 // ECS "registry"
 // ----------------------
+typedef unsigned long int ECSEntityMask;
+typedef size_t ECSEntityId;
+
 typedef struct {
-    unsigned int mask; // bitmask dos componentes
-    size_t id;
+    ECSEntityMask mask; // bitmask dos componentes
+    ECSEntityId id;
 } Entity;
 
 typedef struct {
@@ -82,12 +92,19 @@ typedef struct {
 } Entities;
 
 typedef struct {
-    size_t *items;
+    ECSEntityId *items;
     size_t capacity, count;
 } EntityIds;
 
+typedef void (*ComponentsCleanupCallback)();
+typedef struct {
+    size_t capacity, count;
+    ComponentsCleanupCallback * items;
+} ComponentsCleanups;
+
 static Entities entities;
 static EntityIds dead_entities;
+static ComponentsCleanups components_cleanups;
 
 // ----------------------
 // Helpers
@@ -95,15 +112,16 @@ static EntityIds dead_entities;
 
 Entity* spawn_entity();
 void despawn_entity(Entity *e);
-Entity* get_entity_with_id(size_t id);
-bool has_components(Entity* e, unsigned int mask) ;
+void despawn_entity_with_id(ECSEntityId id);
+Entity* get_entity_with_id(ECSEntityId id);
+bool has_components(Entity* e, ECSEntityMask mask) ;
 size_t component_type_iota();
 
 // #define  ECS_IMPLEMENTATION
 #ifdef ECS_IMPLEMENTATION
 
 Entity* spawn_entity() {
-    size_t id;
+    ECSEntityId id;
     if(dead_entities.count > 0) {
        id = ecs_da_last(&dead_entities);
        dead_entities.count--;
@@ -122,11 +140,16 @@ void despawn_entity(Entity *e) {
     ecs_da_append(&dead_entities, e->id);
 }
 
-Entity* get_entity_with_id(size_t id) {
+void despawn_entity_with_id(ECSEntityId id) {
+    entities.items[id].id = 0;
+    ecs_da_append(&dead_entities, id);
+}
+
+Entity* get_entity_with_id(ECSEntityId id) {
     return &entities.items[id];
 }
 
-bool has_components(Entity* e, unsigned int mask) {
+bool has_components(Entity* e, ECSEntityMask mask) {
     return (e->mask & mask) == mask;
 }
 
@@ -137,13 +160,11 @@ size_t component_type_iota() {
 
 void ecs_deinit() {
     free(entities.items);
-    entities.items = NULL;
-    entities.capacity = 0;
-    entities.count = 0;
     free(dead_entities.items);
-    dead_entities.items = NULL;
-    dead_entities.capacity = 0;
-    dead_entities.count = 0;
+    ecs_da_foreach(ComponentsCleanupCallback, it, &components_cleanups) {
+        (*it)();
+    }
+    free(components_cleanups.items);
 }
 
 #endif // ECS_IMPLEMENTATION
