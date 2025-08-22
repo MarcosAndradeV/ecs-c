@@ -57,12 +57,13 @@ int main(void) {
     add_Player(square, (Player){});
 
     while (!WindowShouldClose()) {
-        keyborad_events_system();
-        move_rects_system();
         BeginDrawing();
-        ClearBackground(DARKGRAY);
-        draw_rects_system();
+            ClearBackground(DARKGRAY);
+            keyborad_events_system();
+            move_rects_system();
+            draw_rects_system();
         EndDrawing();
     }
     CloseWindow();
+    ecs_deinit();
 }
