@@ -50,7 +50,7 @@ int main(void) {
     InitWindow(800, 600, "test");
     SetTargetFPS(60);
 
-    Entity *square = spawn_entity();
+    ECSEntity *square = ecs_spawn_entity();
     add_Rect(square, (Rectangle){100.0f, 100.0f, 20.0f, 20.0f});
     add_Velocity(square, (Velocity){0});
     add_Color(square, RED);
