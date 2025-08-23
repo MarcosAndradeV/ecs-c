@@ -59,11 +59,11 @@
         free(name##_components.items); \
     }\
     void register_##name() { \
-        if(COMP_##name == 0) COMP_##name = 1 << component_type_iota(); \
-        ecs_da_append(&components_cleanups, cleanup_##name);\
+        if(COMP_##name == 0) COMP_##name = 1 << ecs_component_type_iota(); \
+        ecs_da_append(&ecs_components_cleanups, cleanup_##name);\
     }\
-    name* get_##name(Entity* e) { return &name##_components.items[e->id]; } \
-    void add_##name(Entity* e, name value) { \
+    name* get_##name(ECSEntity* e) { return &name##_components.items[e->id]; } \
+    void add_##name(ECSEntity* e, name value) { \
         if(COMP_##name == 0) { printf("[ERROR] Forgot to register `%s` componet first\n", #name); abort(); }\
         e->mask |= COMP_##name; \
         ecs_da_append(&(name##_components), value); \
@@ -71,9 +71,9 @@
 
 #define System(name, ...) void name##_system(__VA_ARGS__)
 #define QueryByComponents(e, ...) \
-    ecs_da_foreach(Entity, e, &entities) if(has_components(e, __VA_ARGS__))
+    ecs_da_foreach(ECSEntity, e, &ecs_entities) if(ecs_has_components(e, __VA_ARGS__))
 #define QueryById(e, _id) \
-    ecs_da_foreach(Entity, e, &entities) if(e->id == _id)
+    ecs_da_foreach(ECSEntity, e, &ecs_entities) if(e->id == _id)
 
 // ----------------------
 // ECS "registry"
@@ -84,87 +84,88 @@ typedef size_t ECSEntityId;
 typedef struct {
     ECSEntityMask mask; // bitmask dos componentes
     ECSEntityId id;
-} Entity;
+} ECSEntity;
 
 typedef struct {
-    Entity *items;
+    ECSEntity *items;
     size_t capacity, count;
-} Entities;
+} ECSEntities;
 
 typedef struct {
     ECSEntityId *items;
     size_t capacity, count;
 } EntityIds;
 
-typedef void (*ComponentsCleanupCallback)();
+typedef void (*ECSComponentsCleanupCallback)();
 typedef struct {
     size_t capacity, count;
-    ComponentsCleanupCallback * items;
-} ComponentsCleanups;
+    ECSComponentsCleanupCallback * items;
+} ECSComponentsCleanups;
 
-static Entities entities;
-static EntityIds dead_entities;
-static ComponentsCleanups components_cleanups;
+static ECSEntities ecs_entities;
+static EntityIds ecs_dead_entities;
+static ECSComponentsCleanups ecs_components_cleanups;
 
 // ----------------------
 // Helpers
 // ----------------------
 
-Entity* spawn_entity();
-void despawn_entity(Entity *e);
-void despawn_entity_with_id(ECSEntityId id);
-Entity* get_entity_with_id(ECSEntityId id);
-bool has_components(Entity* e, ECSEntityMask mask) ;
-size_t component_type_iota();
+ECSEntity* ecs_spawn_entity();
+void ecs_despawn_entity(ECSEntity *e);
+void ecs_despawn_entity_with_id(ECSEntityId id);
+ECSEntity* ecs_get_entity_with_id(ECSEntityId id);
+bool ecs_has_components(ECSEntity* e, ECSEntityMask mask) ;
+size_t ecs_component_type_iota();
+void ecs_deinit();
 
 // #define  ECS_IMPLEMENTATION
 #ifdef ECS_IMPLEMENTATION
 
-Entity* spawn_entity() {
+ECSEntity* ecs_spawn_entity() {
     ECSEntityId id;
-    if(dead_entities.count > 0) {
-       id = ecs_da_last(&dead_entities);
-       dead_entities.count--;
+    if(ecs_dead_entities.count > 0) {
+       id = ecs_da_last(&ecs_dead_entities);
+       ecs_dead_entities.count--;
     } else {
-        id = entities.count;
-        Entity e = {
+        id = ecs_entities.count;
+        ECSEntity e = {
             .id = id,
         };
-        ecs_da_append(&entities, e);
+        ecs_da_append(&ecs_entities, e);
     }
-    return &entities.items[id];
+    return &ecs_entities.items[id];
 }
 
-void despawn_entity(Entity *e) {
+void ecs_despawn_entity(ECSEntity *e) {
     e->mask = 0;
-    ecs_da_append(&dead_entities, e->id);
+    ecs_da_append(&ecs_dead_entities, e->id);
 }
 
-void despawn_entity_with_id(ECSEntityId id) {
-    entities.items[id].id = 0;
-    ecs_da_append(&dead_entities, id);
+void ecs_despawn_entity_with_id(ECSEntityId id) {
+    ecs_entities.items[id].id = 0;
+    ecs_da_append(&ecs_dead_entities, id);
 }
 
-Entity* get_entity_with_id(ECSEntityId id) {
-    return &entities.items[id];
+ECSEntity* ecs_get_entity_with_id(ECSEntityId id) {
+    return &ecs_entities.items[id];
 }
 
-bool has_components(Entity* e, ECSEntityMask mask) {
+bool ecs_has_components(ECSEntity* e, ECSEntityMask mask) {
     return (e->mask & mask) == mask;
 }
 
-size_t component_type_iota() {
+size_t ecs_component_type_iota() {
     static size_t id = 0;
     return id++;
 }
 
 void ecs_deinit() {
-    free(entities.items);
-    free(dead_entities.items);
-    ecs_da_foreach(ComponentsCleanupCallback, it, &components_cleanups) {
+    free(ecs_entities.items);
+    free(ecs_dead_entities.items);
+    ecs_da_foreach(ECSComponentsCleanupCallback, it, &ecs_components_cleanups) {
         (*it)();
     }
-    free(components_cleanups.items);
+    free(ecs_components_cleanups.items);
 }
 
 #endif // ECS_IMPLEMENTATION
