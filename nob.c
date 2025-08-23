@@ -1,15 +1,15 @@
 #define NOB_IMPLEMENTATION
 #define NOB_STRIP_PREFIX
+#define NOB_EXPERIMENTAL_DELETE_OLD
 #include "nob.h"
 
 #define BUILD_DIR "build"
-#define BIN_PATH BUILD_DIR"/game"
-#define SRC_PATH "game.c"
+#define SRC_DIR "examples"
 
-bool build_game(Cmd*cmd) {
+bool build_game(Cmd* cmd, char *input, char *outupt) {
     nob_cc(cmd);
-    nob_cc_inputs(cmd, SRC_PATH);
-    nob_cc_output(cmd, BIN_PATH);
+    nob_cc_inputs(cmd, input);
+    nob_cc_output(cmd, outupt);
     nob_cc_flags(cmd);
     cmd_append(cmd, "-lraylib", "-lGL", "-lm", "-lpthread", "-ldl", "-lrt", "-lX11");
     return cmd_run_sync_and_reset(cmd);
@@ -20,16 +20,8 @@ int main(int argc, char** argv) {
     Cmd cmd = {0};
 
     if(!mkdir_if_not_exists(BUILD_DIR)) return 1;
-    if(!build_game(&cmd)) return 1;
-
-    if(argc <= 1) return 0;
-
-    const char* arg = shift(argv, argc);
-
-    if(strcmp(arg, "run")) {
-        cmd_append(&cmd, BIN_PATH);
-        if(!cmd_run_sync_and_reset(&cmd)) return 1;
-    }
+    if(!build_game(&cmd, SRC_DIR"/snake.c", BUILD_DIR"/snake")) return 1;
+    if(!build_game(&cmd, SRC_DIR"/with_raylib.c", BUILD_DIR"/with_raylib")) return 1;
 
     return 0;
 }
